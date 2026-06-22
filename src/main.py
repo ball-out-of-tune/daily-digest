@@ -385,10 +385,10 @@ def curate_with_deepseek(papers, repos, reddit_posts, hn_stories):
 
 ## 数量：
 - 论文 25 篇 | GitHub 全部保留 | Reddit 10-15 条 | HN 8-12 条
-- 额外1：**今日三大看点**（每类 1 个，可从论文/仓库/帖子中任意选取）：
-  - top_problem: 今天最有吸引力的问题是什么？（一个值得所有人关注的问题）
-  - top_method: 今天最具创新性的解决方法是什么？（一个让人眼前一亮的新思路）
-  - top_buzz: 今天热度最高、大家都在讨论的内容是什么？
+- 额外1：**今日三大看点**（每类选 Top 3，可从论文/仓库/帖子中任意选取）：
+  - top_problems: 今天最有吸引力的 3 个问题是什么？（值得所有人关注的问题）
+  - top_methods: 今天最具创新性的 3 个解决方法是什么？（让人眼前一亮的新思路）
+  - top_buzz: 今天热度最高、大家都在讨论的 3 个内容是什么？
 - 额外2：**趋势与机会**：基于今天所有精选内容，总结以下三方面（每段 3-5 句中文）：
   - problems: 今天的内容反映了大家重点关注了哪些问题？有什么共识或争议？
   - methods: 都用了什么样的创新性解决方法？什么技术路线正在崛起？
@@ -410,7 +410,7 @@ def curate_with_deepseek(papers, repos, reddit_posts, hn_stories):
 {hn_text}
 
 返回 JSON（不要 markdown 代码块）：
-{{"highlights":{{"problem":{{"id":"P3","title":"最有吸引力的问题","desc":"为什么这个问题值得关注"}},"method":{{"id":"G0","title":"最具创新的解决方法","desc":"为什么这个方法眼前一亮"}},"buzz":{{"id":"R0","title":"热度最高的话题","desc":"为什么大家都在讨论"}}}},"papers":[{{"id":"P0","team":"机构","problem":"问题","method":"方法","results":"效果","highlight":"为什么值得看"}}],"repos":[{{"id":"G0","what":"做什么","why":"为什么火"}}],"reddit":[{{"id":"R0","topic":"话题","why":"为什么热"}}],"hn":[{{"id":"H0","topic":"话题","why":"为什么热"}}],"trends":{{"problems":"重点关注的问题","methods":"创新方法汇总","opportunities":"可探索的方向和项目"}}}}"""
+{{"highlights":{{"problems":[{{"id":"P0","desc":"为什么这个问题值得关注"}}],"methods":[{{"id":"G0","desc":"为什么这个方法眼前一亮"}}],"buzz":[{{"id":"R0","desc":"为什么大家都在讨论"}}]}},"papers":[{{"id":"P0","team":"机构","problem":"问题","method":"方法","results":"效果","highlight":"为什么值得看"}}],"repos":[{{"id":"G0","what":"做什么","why":"为什么火"}}],"reddit":[{{"id":"R0","topic":"话题","why":"为什么热"}}],"hn":[{{"id":"H0","topic":"话题","why":"为什么热"}}],"trends":{{"problems":"重点关注的问题","methods":"创新方法汇总","opportunities":"可探索的方向和项目"}}}}"""
 
     try:
         resp = client.chat.completions.create(
@@ -763,56 +763,44 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
 <!-- 今日三大看点 -->
 """
 
-    def _render_highlight(tid, h_title, h_desc, label, color):
+    def _render_highlight(tid, h_desc, color):
         """渲染单个看点条目"""
         prefix = tid[0] if tid else ""
         if prefix == "P":
             p = paper_map.get(tid)
             if p:
                 return f"""
-<div style="margin: 14px 0; padding: 14px; border-radius: 8px; border-left: 4px solid {color}; background: #fffdf5;">
-  <span style="font-size:12px;color:{color};font-weight:600;">{label}</span>
-  <div style="font-weight: 600; color: #1a0dab; font-size: 15px; margin: 6px 0;">
-    <a href="https://arxiv.org/abs/{p['arxiv_id']}" style="color:#1a0dab;text-decoration:none;">{p['title']}</a>
-  </div>
-  <div style="color: #666; font-size: 12px;">{', '.join(p['authors'][:4])} · {p['primary_cat']}</div>
-  <div style="color: #555; font-size: 13px; margin-top: 6px; line-height: 1.6;">{h_desc}</div>
+<div style="margin: 6px 0; padding: 10px; border-radius: 6px; border-left: 3px solid {color}; background: #fffdf5;">
+  <span style="font-size:11px;color:#888;">📄 arXiv</span>
+  <a href="https://arxiv.org/abs/{p['arxiv_id']}" style="font-weight: 600; color: #1a0dab; text-decoration: none; font-size: 13px; display: block; margin: 2px 0;">{p['title']}</a>
+  <div style="color: #555; font-size: 12px; line-height: 1.5;">{h_desc}</div>
 </div>"""
         elif prefix == "G":
             r = repo_map.get(tid)
             if r:
                 return f"""
-<div style="margin: 14px 0; padding: 14px; border-radius: 8px; border-left: 4px solid {color}; background: #fffdf5;">
-  <span style="font-size:12px;color:{color};font-weight:600;">{label}</span>
-  <div style="font-weight: 600; color: #1a0dab; font-size: 15px; margin: 6px 0;">
-    <a href="{r['url']}" style="color:#1a0dab;text-decoration:none;">{r['repo']}</a>
-  </div>
-  <div style="color: #666; font-size: 12px;">{r['description'][:150]}</div>
-  <div style="color: #555; font-size: 13px; margin-top: 6px; line-height: 1.6;">{h_desc}</div>
+<div style="margin: 6px 0; padding: 10px; border-radius: 6px; border-left: 3px solid {color}; background: #fffdf5;">
+  <span style="font-size:11px;color:#888;">📦 GitHub</span>
+  <a href="{r['url']}" style="font-weight: 600; color: #1a0dab; text-decoration: none; font-size: 13px; display: block; margin: 2px 0;">{r['repo']}</a>
+  <div style="color: #555; font-size: 12px; line-height: 1.5;">{h_desc}</div>
 </div>"""
         elif prefix == "R":
             p = reddit_map.get(tid)
             if p:
                 return f"""
-<div style="margin: 14px 0; padding: 14px; border-radius: 8px; border-left: 4px solid {color}; background: #fffdf5;">
-  <span style="font-size:12px;color:{color};font-weight:600;">{label}</span>
-  <div style="font-weight: 600; color: #1a0dab; font-size: 15px; margin: 6px 0;">
-    <a href="{p['url']}" style="color:#1a0dab;text-decoration:none;">{p['title'][:120]}</a>
-  </div>
-  <div style="color: #666; font-size: 12px;">{p['subreddit']}</div>
-  <div style="color: #555; font-size: 13px; margin-top: 6px; line-height: 1.6;">{h_desc}</div>
+<div style="margin: 6px 0; padding: 10px; border-radius: 6px; border-left: 3px solid {color}; background: #fffdf5;">
+  <span style="font-size:11px;color:#888;">💬 {p['subreddit']}</span>
+  <a href="{p['url']}" style="font-weight: 600; color: #1a0dab; text-decoration: none; font-size: 13px; display: block; margin: 2px 0;">{p['title'][:120]}</a>
+  <div style="color: #555; font-size: 12px; line-height: 1.5;">{h_desc}</div>
 </div>"""
         elif prefix == "H":
             s = hn_map.get(tid)
             if s:
                 return f"""
-<div style="margin: 14px 0; padding: 14px; border-radius: 8px; border-left: 4px solid {color}; background: #fffdf5;">
-  <span style="font-size:12px;color:{color};font-weight:600;">{label}</span>
-  <div style="font-weight: 600; color: #1a0dab; font-size: 15px; margin: 6px 0;">
-    <a href="{s['hn_url']}" style="color:#1a0dab;text-decoration:none;">{s['title'][:120]}</a>
-  </div>
-  <div style="color: #666; font-size: 12px;">👍 {s['score']} · 💬 {s['descendants']}</div>
-  <div style="color: #555; font-size: 13px; margin-top: 6px; line-height: 1.6;">{h_desc}</div>
+<div style="margin: 6px 0; padding: 10px; border-radius: 6px; border-left: 3px solid {color}; background: #fffdf5;">
+  <span style="font-size:11px;color:#888;">📰 HN · 👍{s['score']}</span>
+  <a href="{s['hn_url']}" style="font-weight: 600; color: #1a0dab; text-decoration: none; font-size: 13px; display: block; margin: 2px 0;">{s['title'][:120]}</a>
+  <div style="color: #555; font-size: 12px; line-height: 1.5;">{h_desc}</div>
 </div>"""
         return ""
 
@@ -821,20 +809,17 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
         hl = curation["highlights"]
         html += '<h2 style="color: #e6b800; border-bottom: 2px solid #e6b800; padding-bottom: 6px;">⭐ 今日三大看点</h2>'
 
-        # 1. 最有吸引力的问题
-        prob = hl.get("problem", {})
-        if prob:
-            html += _render_highlight(prob.get("id", ""), prob.get("title", ""), prob.get("desc", ""), "❓ 最有吸引力的问题", "#d4a017")
-
-        # 2. 最具创新的解决方法
-        meth = hl.get("method", {})
-        if meth:
-            html += _render_highlight(meth.get("id", ""), meth.get("title", ""), meth.get("desc", ""), "💡 最具创新的解决方法", "#1a7f37")
-
-        # 3. 热度最高的讨论
-        buzz = hl.get("buzz", {})
-        if buzz:
-            html += _render_highlight(buzz.get("id", ""), buzz.get("title", ""), buzz.get("desc", ""), "🔥 热度最高的讨论", "#ff4500")
+        for label, key, color, emoji in [
+            ("最有吸引力的问题", "problems", "#d4a017", "❓"),
+            ("最具创新的解决方法", "methods", "#1a7f37", "💡"),
+            ("热度最高的讨论", "buzz", "#ff4500", "🔥"),
+        ]:
+            items = hl.get(key, [])[:3]
+            if items:
+                html += f'<div style="margin-bottom: 16px;"><div style="font-weight: 600; color: {color}; font-size: 14px; margin-bottom: 8px;">{emoji} {label}</div>'
+                for item in items:
+                    html += _render_highlight(item.get("id", ""), item.get("desc", ""), color)
+                html += '</div>'
 
     html += """
 <!-- arXiv -->
