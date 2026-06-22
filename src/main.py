@@ -685,12 +685,45 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
     hn_map = {f"H{i}": s for i, s in enumerate(hn_stories)}
 
     html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<style>
+  @media (prefers-color-scheme: dark) {{
+    body, .card {{ background: #1a1a2e !important; }}
+    .card {{ box-shadow: 0 2px 8px rgba(255,255,255,0.05) !important; }}
+    h1 {{ color: #e0e0e0 !important; }}
+    h2 {{ color: #ddd !important; }}
+    .subtitle {{ color: #999 !important; }}
+    .paper-bg {{ background: #2a1a1a !important; }}
+    .repo-bg {{ background: #1a2a1a !important; }}
+    .reddit-bg {{ background: #2a2018 !important; }}
+    .hn-bg {{ background: #2a2418 !important; }}
+    .trend-bg {{ background: #1e1a30 !important; }}
+    .top3-bg {{ background: #2a2810 !important; }}
+    .section-link {{ color: #8ab4f8 !important; }}
+    .field-text {{ color: #bbb !important; }}
+    .reason-text {{ color: #ccc !important; }}
+    .footer-text {{ color: #777 !important; }}
+    .border-divider {{ border-color: #333 !important; }}
+  }}
+  @media only screen and (max-width: 480px) {{
+    body {{ padding: 8px !important; }}
+    .card {{ padding: 16px !important; border-radius: 8px !important; }}
+    .paper-item {{ padding: 10px !important; }}
+    h1 {{ font-size: 20px !important; }}
+    h2 {{ font-size: 16px !important; }}
+    a {{ font-size: 14px !important; }}
+  }}
+</style>
+</head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 680px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
-<div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+<div class="card" style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
 
 <h1 style="color: #1a1a2e; margin: 0 0 4px 0;">📋 每日科技摘要</h1>
-<p style="color: #888; margin: 0 0 24px 0; font-size: 14px;">论文日期: {target_date_display} · {time_label} · AI 策展</p>
+<p class="subtitle" style="color: #888; margin: 0 0 24px 0; font-size: 14px;">论文日期: {target_date_display} · {time_label} · AI 策展</p>
 
 <!-- 趋势与机会（最前面）-->
 """
