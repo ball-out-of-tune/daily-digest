@@ -688,6 +688,20 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
     reddit_map = {f"R{i}": p for i, p in enumerate(reddit_posts)}
     hn_map = {f"H{i}": s for i, s in enumerate(hn_stories)}
 
+    # 从 DeepSeek 精选结果中提取论文团队映射
+    paper_teams = {}
+    if curation and curation.get("papers"):
+        for item in curation["papers"]:
+            pid = item["id"]
+            p = paper_map.get(pid)
+            if p:
+                ds_team = item.get("team", "")
+                sc_team = p.get("scraped_team", "")
+                if sc_team and ("未知" in str(ds_team) or not ds_team):
+                    paper_teams[pid] = sc_team
+                elif ds_team and "未知" not in str(ds_team):
+                    paper_teams[pid] = ds_team
+
     html = f"""<!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -770,7 +784,7 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
         if prefix == "P":
             p = paper_map.get(tid)
             if p:
-                team_str = p.get("scraped_team", "") or ", ".join(p['authors'][:2])
+                team_str = paper_teams.get(tid) or p.get("scraped_team") or ", ".join(p['authors'][:2])
                 return f"""
 <div style="margin: 6px 0; padding: 10px; border-radius: 6px; border-left: 3px solid {color}; background: #fffdf5;">
   <span style="font-size:11px;color:#888;">arXiv / {team_str}</span>
