@@ -1016,12 +1016,14 @@ def main():
 
     # 1. 拉取数据（arXiv 可能需回退到有论文的日期）
     papers = []
-    for retry in range(3):
+    for retry in range(7):
         papers = fetch_arxiv_papers(target_date_str, target_date_display)
         if papers:
             break
-        # 回退一天再试
+        # 回退一天再试（跳过周末）
         t = datetime.strptime(target_date_str, "%Y%m%d") - timedelta(days=1)
+        while t.weekday() >= 5:  # 5=Sat, 6=Sun
+            t = t - timedelta(days=1)
         target_date_str = t.strftime("%Y%m%d")
         target_date_display = t.strftime("%Y-%m-%d")
         print(f"  🔄 无数据，回退到 {target_date_display}")
