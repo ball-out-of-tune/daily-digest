@@ -727,9 +727,10 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
 <div class="card" style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
 
 <h1 style="color: #1a1a2e; margin: 0 0 4px 0;">📋 每日科技摘要</h1>
-<p class="subtitle" style="color: #888; margin: 0 0 24px 0; font-size: 14px;">论文日期: {target_date_display} · {time_label} · AI 策展</p>
+<p class="subtitle" style="color: #888; margin: 0 0 2px 0; font-size: 14px;">论文日期: {target_date_display} · {time_label} · AI 策展</p>
+<p style="color: #aaa; font-size: 11px; margin: 0 0 18px 0; text-align: right;">📊 本次消耗: {usage.get('total_tokens', '?')} tokens</p>
 
-<!-- 趋势与机会（最前面）-->
+<!-- 趋势与机会 -->
 """
 
     # 趋势与机会（移到最前面）
@@ -769,9 +770,10 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
         if prefix == "P":
             p = paper_map.get(tid)
             if p:
+                team_str = p.get("scraped_team", "") or ", ".join(p['authors'][:2])
                 return f"""
 <div style="margin: 6px 0; padding: 10px; border-radius: 6px; border-left: 3px solid {color}; background: #fffdf5;">
-  <span style="font-size:11px;color:#888;">📄 arXiv</span>
+  <span style="font-size:11px;color:#888;">arXiv / {team_str}</span>
   <a href="https://arxiv.org/abs/{p['arxiv_id']}" style="font-weight: 600; color: #1a0dab; text-decoration: none; font-size: 13px; display: block; margin: 2px 0;">{p['title']}</a>
   <div style="color: #555; font-size: 12px; line-height: 1.5;">{h_desc}</div>
 </div>"""
