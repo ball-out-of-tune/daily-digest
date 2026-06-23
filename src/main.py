@@ -692,19 +692,35 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
     reddit_map = {f"R{i}": p for i, p in enumerate(reddit_posts)}
     hn_map = {f"H{i}": s for i, s in enumerate(hn_stories)}
 
-    # 从 DeepSeek 精选结果中提取论文团队映射
+    # 统一团队查找函数（论文区和看点区共用）
+    def _resolve_team(pid, p, ds_team):
+        scraped = p.get("scraped_team", "")
+        if scraped and ("未知" in str(ds_team) or "未注明" in str(ds_team) or "独立研究者" in str(ds_team) or not ds_team):
+            return scraped
+        if ds_team and "未知" not in str(ds_team) and "未注明" not in str(ds_team) and "独立研究者" not in str(ds_team):
+            return ds_team
+        if scraped:
+            return scraped
+        # 摘要兜底
+        abstract_lower = p.get('summary', '').lower()
+        for inst in ["OpenAI", "DeepMind", "Google", "Anthropic", "Meta", "Stanford", "MIT", "CMU",
+                      "Microsoft", "NVIDIA", "Berkeley", "Oxford", "Cambridge", "ETH Zurich",
+                      "Princeton", "Harvard", "Tsinghua", "Peking", "NYU", "University of Washington",
+                      "University of Toronto", "Bytedance", "Alibaba", "Tencent"]:
+            if inst.lower() in abstract_lower:
+                return inst
+        return ""
+
+    # 构建统一的论文团队映射
     paper_teams = {}
     if curation and curation.get("papers"):
         for item in curation["papers"]:
             pid = item["id"]
             p = paper_map.get(pid)
             if p:
-                ds_team = item.get("team", "")
-                sc_team = p.get("scraped_team", "")
-                if sc_team and ("未知" in str(ds_team) or not ds_team):
-                    paper_teams[pid] = sc_team
-                elif ds_team and "未知" not in str(ds_team):
-                    paper_teams[pid] = ds_team
+                team = _resolve_team(pid, p, item.get("team", ""))
+                if team:
+                    paper_teams[pid] = team
 
     html = f"""<!DOCTYPE html>
 <html lang="zh">
@@ -788,18 +804,9 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
         if prefix == "P":
             p = paper_map.get(tid)
             if p:
-                institution = paper_teams.get(tid) or p.get("scraped_team") or ""
-                # 摘要兜底搜机构
-                if not institution or "未知" in str(institution):
-                    abstract_lower = p['summary'].lower()
-                    for inst in ["OpenAI", "DeepMind", "Google", "Anthropic", "Meta", "Stanford", "MIT", "CMU",
-                                 "Microsoft", "NVIDIA", "Berkeley", "Oxford", "Cambridge", "ETH Zurich",
-                                 "Princeton", "Harvard", "Tsinghua", "Peking", "NYU"]:
-                        if inst.lower() in abstract_lower:
-                            institution = inst
-                            break
+                institution = paper_teams.get(tid, "")
                 authors_short = ", ".join(p['authors'][:3])
-                if institution and "未知" not in str(institution):
+                if institution:
                     team_str = f"{authors_short} ({institution})"
                 else:
                     team_str = authors_short
@@ -869,33 +876,9 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
                 continue
             team_badge = ' <span style="background:#b83b3b;color:white;padding:1px 6px;border-radius:4px;font-size:10px;">知名团队</span>' if p["has_known_team"] else ""
 
-            # 团队：DeepSeek > 爬虫 > 摘要搜机构 > 明确标注"未注明"
-            team_ds = item.get("team", "")
-            team_scraped = p.get("scraped_team", "")
-            team_from_abstract = ""
-            if not team_scraped and (not team_ds or "未知" in str(team_ds) or "未注明" in str(team_ds) or "独立研究者" in str(team_ds)):
-                # 从摘要中搜机构名作为最后兜底
-                abstract_lower = p['summary'].lower()
-                for inst in ["OpenAI", "DeepMind", "Google", "Anthropic", "Meta AI", "Meta",
-                             "Microsoft", "NVIDIA", "Apple", "Stanford", "MIT", "CMU",
-                             "Carnegie Mellon", "UC Berkeley", "Berkeley", "Oxford", "Cambridge",
-                             "ETH Zurich", "ETH", "Princeton", "Harvard", "Caltech",
-                             "Tsinghua", "Peking", "NYU", "Columbia", "Cornell",
-                             "University of Washington", "University of Toronto",
-                             "Bytedance", "Alibaba", "Tencent", "Baidu"]:
-                    if inst.lower() in abstract_lower:
-                        team_from_abstract = inst
-                        break
-
-            if team_scraped and ("未知" in str(team_ds) or "未注明" in str(team_ds) or "独立研究者" in str(team_ds) or not team_ds):
-                team = team_scraped
-            elif team_ds and "未知" not in str(team_ds) and "未注明" not in str(team_ds) and "独立研究者" not in str(team_ds):
-                team = team_ds
-            elif team_scraped:
-                team = team_scraped
-            elif team_from_abstract:
-                team = team_from_abstract
-            else:
+            # 团队：使用统一查找函数
+            team = paper_teams.get(pid, "")
+            if not team:
                 team = "未注明机构"
             problem = item.get("problem", "")
             method = item.get("method", "")
