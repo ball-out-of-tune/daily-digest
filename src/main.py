@@ -394,8 +394,12 @@ def curate_with_deepseek(papers, repos, reddit_posts, hn_stories):
   - methods: 都用了什么样的创新性解决方法？什么技术路线正在崛起？
   - opportunities: 基于这些趋势，我们可以做什么样的项目和科研？有什么被忽视但值得做的方向？
 
-## 团队名要求：
-- 团队请写**具体机构全名**，如"Stanford University"而非"多家学术机构"、如"Google Research"而非"科技巨头"、如"MIT CSAIL"而非"高校"。从作者名和摘要推断，无法确定的具体到哪个学校/公司也写"未知"。
+## 团队名要求（非常重要！绝不允许省略！）：
+- **必须**为每篇论文写出具体的机构全名，如果有多个机构就写多个
+- **不允许**写"未知"、"多家机构"、"高校"、"某科技公司"等模糊说法
+- 从作者姓名反推：如作者包含"Ilya Sutskever"→ OpenAI、"Yann LeCun"→ Meta/NYU、"Geoffrey Hinton"→ University of Toronto
+- 从摘要关键词反推：如"Gemini"→ Google、"Claude"→ Anthropic、"GPT"→ OpenAI
+- 实在无法确定时，写"独立研究者"或"未注明机构"，但必须尽力而为
 
 ## arXiv 论文（{len(papers)} 篇，🏢=知名团队）
 {papers_text}
@@ -417,7 +421,7 @@ def curate_with_deepseek(papers, repos, reddit_posts, hn_stories):
             model=DEEPSEEK_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=14000,
+            max_tokens=20000,
         )
         content = resp.choices[0].message.content.strip()
         usage = {
@@ -785,8 +789,17 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
             p = paper_map.get(tid)
             if p:
                 institution = paper_teams.get(tid) or p.get("scraped_team") or ""
+                # 摘要兜底搜机构
+                if not institution or "未知" in str(institution):
+                    abstract_lower = p['summary'].lower()
+                    for inst in ["OpenAI", "DeepMind", "Google", "Anthropic", "Meta", "Stanford", "MIT", "CMU",
+                                 "Microsoft", "NVIDIA", "Berkeley", "Oxford", "Cambridge", "ETH Zurich",
+                                 "Princeton", "Harvard", "Tsinghua", "Peking", "NYU"]:
+                        if inst.lower() in abstract_lower:
+                            institution = inst
+                            break
                 authors_short = ", ".join(p['authors'][:3])
-                if institution:
+                if institution and "未知" not in str(institution):
                     team_str = f"{authors_short} ({institution})"
                 else:
                     team_str = authors_short
@@ -856,17 +869,34 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
                 continue
             team_badge = ' <span style="background:#b83b3b;color:white;padding:1px 6px;border-radius:4px;font-size:10px;">知名团队</span>' if p["has_known_team"] else ""
 
-            # 团队：DeepSeek > 爬虫 > 作者兜底
+            # 团队：DeepSeek > 爬虫 > 摘要搜机构 > 明确标注"未注明"
             team_ds = item.get("team", "")
             team_scraped = p.get("scraped_team", "")
-            if team_scraped and ("未知" in str(team_ds) or not team_ds):
+            team_from_abstract = ""
+            if not team_scraped and (not team_ds or "未知" in str(team_ds) or "未注明" in str(team_ds) or "独立研究者" in str(team_ds)):
+                # 从摘要中搜机构名作为最后兜底
+                abstract_lower = p['summary'].lower()
+                for inst in ["OpenAI", "DeepMind", "Google", "Anthropic", "Meta AI", "Meta",
+                             "Microsoft", "NVIDIA", "Apple", "Stanford", "MIT", "CMU",
+                             "Carnegie Mellon", "UC Berkeley", "Berkeley", "Oxford", "Cambridge",
+                             "ETH Zurich", "ETH", "Princeton", "Harvard", "Caltech",
+                             "Tsinghua", "Peking", "NYU", "Columbia", "Cornell",
+                             "University of Washington", "University of Toronto",
+                             "Bytedance", "Alibaba", "Tencent", "Baidu"]:
+                    if inst.lower() in abstract_lower:
+                        team_from_abstract = inst
+                        break
+
+            if team_scraped and ("未知" in str(team_ds) or "未注明" in str(team_ds) or "独立研究者" in str(team_ds) or not team_ds):
                 team = team_scraped
-            elif team_ds and "未知" not in str(team_ds):
+            elif team_ds and "未知" not in str(team_ds) and "未注明" not in str(team_ds) and "独立研究者" not in str(team_ds):
                 team = team_ds
             elif team_scraped:
                 team = team_scraped
+            elif team_from_abstract:
+                team = team_from_abstract
             else:
-                team = f"作者: {', '.join(p['authors'][:3])}"
+                team = "未注明机构"
             problem = item.get("problem", "")
             method = item.get("method", "")
             results = item.get("results", "")
