@@ -385,10 +385,10 @@ def curate_with_deepseek(papers, repos, reddit_posts, hn_stories):
 
 ## 数量：
 - 论文 25 篇 | GitHub 全部保留 | Reddit 10-15 条 | HN 8-12 条
-- 额外1：**今日三大看点**（每类选 Top 3，可从论文/仓库/帖子中任意选取）：
-  - top_problems: 今天最有吸引力的 3 个问题是什么？（值得所有人关注的问题）
-  - top_methods: 今天最具创新性的 3 个解决方法是什么？（让人眼前一亮的新思路）
-  - top_buzz: 今天热度最高、大家都在讨论的 3 个内容是什么？
+- 额外1：**今日三大看点**（每类选 Top 3）：
+  - top_problems: 今天最有吸引力的 3 个问题——**必须从 arXiv 论文或 GitHub 仓库中选**
+  - top_methods: 今天最具创新性的 3 个解决方法——**必须从 arXiv 论文或 GitHub 仓库中选**
+  - top_buzz: 今天热度最高的 3 个讨论——任意来源均可
 - 额外2：**趋势与机会**：基于今天所有精选内容，总结以下三方面（每段 3-5 句中文）：
   - problems: 今天的内容反映了大家重点关注了哪些问题？有什么共识或争议？
   - methods: 都用了什么样的创新性解决方法？什么技术路线正在崛起？
@@ -784,10 +784,15 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
         if prefix == "P":
             p = paper_map.get(tid)
             if p:
-                team_str = paper_teams.get(tid) or p.get("scraped_team") or ", ".join(p['authors'][:2])
+                institution = paper_teams.get(tid) or p.get("scraped_team") or ""
+                authors_short = ", ".join(p['authors'][:3])
+                if institution:
+                    team_str = f"{authors_short} ({institution})"
+                else:
+                    team_str = authors_short
                 return f"""
 <div style="margin: 6px 0; padding: 10px; border-radius: 6px; border-left: 3px solid {color}; background: #fffdf5;">
-  <span style="font-size:11px;color:#888;">arXiv / {team_str}</span>
+  <span style="font-size:11px;color:#888;">{team_str}</span>
   <a href="https://arxiv.org/abs/{p['arxiv_id']}" style="font-weight: 600; color: #1a0dab; text-decoration: none; font-size: 13px; display: block; margin: 2px 0;">{p['title']}</a>
   <div style="color: #555; font-size: 12px; line-height: 1.5;">{h_desc}</div>
 </div>"""
@@ -851,13 +856,17 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
                 continue
             team_badge = ' <span style="background:#b83b3b;color:white;padding:1px 6px;border-radius:4px;font-size:10px;">知名团队</span>' if p["has_known_team"] else ""
 
-            # 团队：优先用爬虫补上的，其次用 DeepSeek 识别的
+            # 团队：DeepSeek > 爬虫 > 作者兜底
             team_ds = item.get("team", "")
             team_scraped = p.get("scraped_team", "")
             if team_scraped and ("未知" in str(team_ds) or not team_ds):
                 team = team_scraped
+            elif team_ds and "未知" not in str(team_ds):
+                team = team_ds
+            elif team_scraped:
+                team = team_scraped
             else:
-                team = team_ds if team_ds and "未知" not in str(team_ds) else team_scraped
+                team = f"作者: {', '.join(p['authors'][:3])}"
             problem = item.get("problem", "")
             method = item.get("method", "")
             results = item.get("results", "")
