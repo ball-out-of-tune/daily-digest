@@ -337,15 +337,15 @@ def curate_with_deepseek(papers, repos, reddit_posts, hn_stories):
 
     client = OpenAI(api_key=DEEPSEEK_KEY, base_url=DEEPSEEK_BASE)
 
-    # 构建论文列表
+    # 构建论文列表（精简每条以节省 token）
     papers_lines = []
     for i, p in enumerate(papers):
-        team_tag = "🏢知名团队" if p["has_known_team"] else ""
-        cats_str = ", ".join(p["categories"][:3])
+        team_tag = "🏢" if p["has_known_team"] else ""
+        cats_str = ", ".join(p["categories"][:2])
         papers_lines.append(
             f"[P{i}] {team_tag} [{cats_str}] {p['title']}\n"
-            f"    作者: {', '.join(p['authors'][:5])}\n"
-            f"    摘要: {p['summary'][:300]}"
+            f"    作者: {', '.join(p['authors'][:4])}\n"
+            f"    摘要: {p['summary'][:200]}"
         )
     papers_text = "\n".join(papers_lines)
 
@@ -421,31 +421,52 @@ def curate_with_deepseek(papers, repos, reddit_posts, hn_stories):
             model=DEEPSEEK_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=20000,
+            max_tokens=30000,
+            timeout=180,
         )
         content = resp.choices[0].message.content.strip()
-        usage = {
-            "prompt_tokens": resp.usage.prompt_tokens if resp.usage else 0,
-            "completion_tokens": resp.usage.completion_tokens if resp.usage else 0,
-            "total_tokens": resp.usage.total_tokens if resp.usage else 0,
-        }
-        if content.startswith("```"):
-            lines = content.split("\n")
-            content = "\n".join(lines[1:])
-            if content.endswith("```"):
-                content = content[:-3]
-        content = content.strip()
-        result = json.loads(content)
+        # 安全获取 usage（某些 API 响应可能没有 usage）
+        try:
+            usage = {
+                "prompt_tokens": resp.usage.prompt_tokens if resp.usage else 0,
+                "completion_tokens": resp.usage.completion_tokens if resp.usage else 0,
+                "total_tokens": resp.usage.total_tokens if resp.usage else 0,
+            }
+        except Exception:
+            usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        # 清除 markdown 代码块包裹
+        clean = content
+        if clean.startswith("```"):
+            lines = clean.split("\n")
+            clean = "\n".join(lines[1:])
+            if clean.endswith("```"):
+                clean = clean[:-3]
+        clean = clean.strip()
+        print(f"  📝 响应长度: {len(clean)} 字符")
+        try:
+            result = json.loads(clean)
+        except json.JSONDecodeError as je:
+            print(f"  ⚠ JSON 解析失败 (位置 {je.pos}): {je}")
+            print(f"  最后 500 字符: ...{clean[-500:]}")
+            # 尝试修复：截断到最后一个完整对象
+            if clean.rstrip().endswith(('}', ']', '"')):
+                pass  # looks complete, but failed
+            return None
         result["_usage"] = usage
         print(f"  ✅ AI 筛选完成：论文 {len(result.get('papers',[]))} 篇, 仓库 {len(result.get('repos',[]))} 个, Reddit {len(result.get('reddit',[]))} 条, HN {len(result.get('hn',[]))} 条")
-        print(f"  📊 Token: 输入 {usage['prompt_tokens']} + 输出 {usage['completion_tokens']} = {usage['total_tokens']}")
+        if result.get("trends"):
+            print(f"  ✅ 趋势与机会: 已生成")
+        if result.get("highlights"):
+            print(f"  ✅ 三大看点: 已生成")
+        if usage['total_tokens'] > 0:
+            print(f"  📊 Token: 输入 {usage['prompt_tokens']} + 输出 {usage['completion_tokens']} = {usage['total_tokens']}")
+        else:
+            print(f"  📊 Token: 未返回（API 限制）")
         return result
-    except json.JSONDecodeError as e:
-        print(f"  ⚠ DeepSeek 返回非 JSON")
-        print(f"  返回内容: {content[:800] if 'content' in dir() else 'N/A'}")
-        return None
     except Exception as e:
         print(f"  ⚠ DeepSeek 出错: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -650,6 +671,7 @@ def generate_context_with_deepseek(papers, selected_ids):
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
             max_tokens=4096,
+            timeout=120,
         )
         content = resp.choices[0].message.content.strip()
         if content.startswith("```"):
@@ -685,6 +707,7 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
     now = datetime.now()
     time_label = "上午版" if now.hour < 14 else "下午版"
     usage = curation.get("_usage", {}) if curation else {}
+    total_tokens = usage.get("total_tokens", 0) if usage else 0
 
     # 建立索引
     paper_map = {f"P{i}": p for i, p in enumerate(papers)}
@@ -762,7 +785,7 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
 
 <h1 style="color: #1a1a2e; margin: 0 0 4px 0;">📋 每日科技摘要</h1>
 <p class="subtitle" style="color: #888; margin: 0 0 2px 0; font-size: 14px;">论文日期: {target_date_display} · {time_label} · AI 策展</p>
-<p style="color: #aaa; font-size: 11px; margin: 0 0 18px 0; text-align: right;">📊 本次消耗: {usage.get('total_tokens', '?')} tokens</p>
+<p style="color: #aaa; font-size: 11px; margin: 0 0 18px 0; text-align: right;">📊 本次消耗: {total_tokens or '未统计'} tokens</p>
 
 <!-- 趋势与机会 -->
 """
@@ -790,10 +813,9 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
   </div>
 </div>"""
 
-    # Token 小标签
-    token_info = f"{usage.get('total_tokens', '?')} tokens" if usage else ""
+    # Token 小标签（趋势与机会之后）
     html += f"""
-<div style="text-align: right; color: #aaa; font-size: 11px; margin-bottom: 16px;">📊 本次消耗: {token_info}</div>
+<div style="text-align: right; color: #aaa; font-size: 11px; margin-bottom: 16px;">📊 本次消耗: {total_tokens or '未统计'} tokens</div>
 
 <!-- 今日三大看点 -->
 """
@@ -1000,7 +1022,9 @@ def render_email(papers, repos, reddit_posts, hn_stories, curation, target_date_
 </div>"""
 
     next_time = "下午 17:00" if "上午" in time_label else "明早 08:00"
-    token_detail = f"输入 {usage.get('prompt_tokens', '?')} + 输出 {usage.get('completion_tokens', '?')} = {usage.get('total_tokens', '?')} tokens" if usage else ""
+    prompt_t = usage.get("prompt_tokens", 0) if usage else 0
+    comp_t = usage.get("completion_tokens", 0) if usage else 0
+    token_detail = f"输入 {prompt_t or '?'} + 输出 {comp_t or '?'} = {total_tokens or '?'} tokens"
     html += f"""
 <div style="margin-top: 30px; padding-top: 16px; border-top: 1px solid #eee; color: #aaa; font-size: 11px; text-align: center;">
   📮 每日自动推送 · 下一封将在 {next_time} 送达<br>
