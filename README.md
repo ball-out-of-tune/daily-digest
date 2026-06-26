@@ -95,7 +95,14 @@ Hacker News (15 stories)   ─┤       │
 
 ### 📬 Email Preview
 
-> [Screenshot placeholder — add your screenshot here!]
+![Daily Digest Email Screenshot](assets/email-preview-top.png)
+
+<details>
+<summary>📜 查看完整邮件截图 (点击展开)</summary>
+
+![Full Email Scroll](assets/email-preview.jpg)
+
+</details>
 
 ---
 
@@ -161,7 +168,14 @@ python src/main.py
 
 ### 📧 邮件截图
 
-> [在此处放一张邮件截图]
+![每日科技摘要邮件截图](assets/email-preview-top.png)
+
+<details>
+<summary>📜 查看完整邮件截图 (点击展开)</summary>
+
+![完整邮件](assets/email-preview.jpg)
+
+</details>
 
 ---
 
